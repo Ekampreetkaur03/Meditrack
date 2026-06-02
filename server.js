@@ -1,4 +1,5 @@
 require('dotenv').config();
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -16,52 +17,84 @@ const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST', 'PATCH', 'DELETE'] }
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST', 'PATCH', 'DELETE']
+  }
 });
 
+// Middleware
 app.use(cors());
 app.use(express.json());
+
+// Serve frontend files from current folder
 app.use(express.static(__dirname));
 
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/queue', queueRouter);
 app.use('/api/staff', staffRoutes);
 
+// WhatsApp routes
 app.get('/api/whatsapp/status', (req, res) => {
   res.json(whatsapp.getStatus());
 });
 
 app.get('/api/whatsapp/qr', (req, res) => {
   const qr = whatsapp.getQR();
-  if (qr) res.json({ qr });
-  else res.json({ qr: null, status: whatsapp.getStatus() });
+
+  if (qr) {
+    res.json({ qr });
+  } else {
+    res.json({
+      qr: null,
+      status: whatsapp.getStatus()
+    });
+  }
 });
 
 app.post('/api/whatsapp/test', authMiddleware, async (req, res) => {
-  const { phone, message } = req.body;
-  const result = await whatsapp.sendWhatsAppMessage(
-    phone || process.env.WHATSAPP_OWNER,
-    message || 'MediTrack test message ✅'
-  );
-  res.json(result);
+  try {
+    const { phone, message } = req.body;
+
+    const result = await whatsapp.sendWhatsAppMessage(
+      phone || process.env.WHATSAPP_OWNER,
+      message || 'MediTrack test message ✅'
+    );
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      error: err.message
+    });
+  }
 });
 
+// Ambulance request
 app.post('/api/ambulance', async (req, res) => {
   try {
     const { phone, name, location } = req.body;
     const ownerPhone = process.env.WHATSAPP_OWNER;
+
     if (ownerPhone) {
       await whatsapp.sendWhatsAppMessage(
         ownerPhone,
         `🚑 Ambulance Request\nName: ${name || 'Patient'}\nPhone: ${phone || 'Not provided'}\nLocation: ${location || 'Not provided'}`
       );
     }
-    res.json({ message: 'Ambulance request received' });
+
+    res.json({
+      message: 'Ambulance request received'
+    });
+
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      error: err.message
+    });
   }
 });
 
+// Analytics
 app.get('/api/analytics', authMiddleware, async (req, res) => {
   try {
     const { Token } = require('./models');
@@ -70,28 +103,63 @@ app.get('/api/analytics', authMiddleware, async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [todayTotal, todayDone, todayWaiting, todayCalled, byDept] = await Promise.all([
-      Token.countDocuments({ hospital: hospitalId, createdAt: { $gte: today } }),
-      Token.countDocuments({ hospital: hospitalId, createdAt: { $gte: today }, status: 'Done' }),
-      Token.countDocuments({ hospital: hospitalId, status: 'Waiting' }),
-      Token.countDocuments({ hospital: hospitalId, status: 'Called' }),
-      Token.aggregate([
-        {
-          $match: {
-            hospital: mongoose.Types.ObjectId.createFromHexString(hospitalId.toString()),
-            createdAt: { $gte: today }
-          }
-        },
-        { $group: { _id: '$department', count: { $sum: 1 } } }
-      ])
-    ]);
+    const [todayTotal, todayDone, todayWaiting, todayCalled, byDept] =
+      await Promise.all([
+        Token.countDocuments({
+          hospital: hospitalId,
+          createdAt: { $gte: today }
+        }),
 
-    res.json({ todayTotal, todayDone, todayWaiting, todayCalled, byDept });
+        Token.countDocuments({
+          hospital: hospitalId,
+          createdAt: { $gte: today },
+          status: 'Done'
+        }),
+
+        Token.countDocuments({
+          hospital: hospitalId,
+          status: 'Waiting'
+        }),
+
+        Token.countDocuments({
+          hospital: hospitalId,
+          status: 'Called'
+        }),
+
+        Token.aggregate([
+          {
+            $match: {
+              hospital: mongoose.Types.ObjectId.createFromHexString(
+                hospitalId.toString()
+              ),
+              createdAt: { $gte: today }
+            }
+          },
+          {
+            $group: {
+              _id: '$department',
+              count: { $sum: 1 }
+            }
+          }
+        ])
+      ]);
+
+    res.json({
+      todayTotal,
+      todayDone,
+      todayWaiting,
+      todayCalled,
+      byDept
+    });
+
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      error: err.message
+    });
   }
 });
 
+// Socket.IO
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
@@ -105,25 +173,41 @@ io.on('connection', (socket) => {
   });
 });
 
+// Initialize Socket and WhatsApp
 setQueueIO(io);
 whatsapp.setIO(io);
 
+// MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
-  console.error('MongoDB connection error: MONGODB_URI missing in .env');
+  console.error('MongoDB connection error: MONGODB_URI missing');
 } else {
   mongoose.connect(MONGODB_URI)
     .then(() => {
       console.log('✅ MongoDB connected');
       whatsapp.connectWhatsApp().catch(console.error);
     })
-    .catch(err => {
+    .catch((err) => {
       console.error('MongoDB connection error:', err.message);
       whatsapp.connectWhatsApp().catch(console.error);
     });
 }
 
+// API 404 handler
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: 'API route not found',
+    path: req.originalUrl
+  });
+});
+
+// Frontend fallback
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Server
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
@@ -132,12 +216,7 @@ server.listen(PORT, () => {
   console.log(`🌐 Open: http://localhost:${PORT}\n`);
 });
 
-app.use('/api', (req, res) => {
-  res.status(404).json({ error: 'API route not found', path: req.originalUrl });
-});
-
-app.use((req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/index.html'));
-});
-
-module.exports = { app, io };
+module.exports = {
+  app,
+  io
+};
