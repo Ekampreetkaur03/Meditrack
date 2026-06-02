@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MediTrack Dashboard</title>
+<style>
+*{box-sizing:border-box} body{font-family:Arial;background:#0b1220;margin:0;color:white}.top{padding:22px 28px;background:#111827;display:flex;justify-content:space-between;align-items:center}.brand{font-size:28px;color:#67e8f9;font-weight:bold}.wrap{max-width:1200px;margin:0 auto;padding:25px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}.card{background:#111827;border:1px solid #1f2a44;border-radius:18px;padding:20px}.big{font-size:34px;font-weight:bold;color:#67e8f9}.muted{color:#94a3b8}.actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;margin-top:25px}button{padding:12px 16px;border:0;border-radius:12px;background:#2563EB;color:white;font-weight:bold;cursor:pointer}.danger{background:#dc2626}.gray{background:#64748b}input,select,textarea{width:100%;padding:11px;margin-top:10px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:white}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}.hidden{display:none}.table{width:100%;border-collapse:collapse;margin-top:15px}th,td{border-bottom:1px solid #26344f;padding:10px;text-align:left}.msg{margin-top:12px;color:#4ade80}.err{color:#f87171}
+</style>
+</head>
+<body>
+<div class="top"><div><div class="brand">MediTrack</div><div class="muted" id="welcome"></div></div><div><button onclick="loadAll()">Refresh</button> <button class="gray" onclick="logout()">Logout</button></div></div>
+<div class="wrap">
+<div class="grid"><div class="card"><div class="muted">Waiting</div><div class="big" id="waiting">0</div></div><div class="card"><div class="muted">Called</div><div class="big" id="called">0</div></div><div class="card"><div class="muted">Done Today</div><div class="big" id="done">0</div></div><div class="card"><div class="muted">Total Today</div><div class="big" id="total">0</div></div></div>
+<div class="actions"><div class="card"><h3>Add Patient</h3><div class="row"><input id="pname" placeholder="Patient Name"><input id="phone" placeholder="Phone Number"><input id="age" type="number" placeholder="Age"><select id="gender"><option>Male</option><option>Female</option><option>Other</option></select><select id="department"><option>General</option><option>Emergency</option><option>Cardiology</option><option>Orthopedics</option><option>Pediatrics</option></select><select id="priority"><option>Normal</option><option>Urgent</option><option>Emergency</option></select></div><textarea id="notes" placeholder="Notes"></textarea><button onclick="addPatient()">Add Patient</button><div id="addMsg" class="msg"></div></div><div class="card"><h3>Quick Actions</h3><button onclick="callNext()">🔔 Call Next</button><button onclick="testWhatsApp()">💬 Test WhatsApp</button><button class="danger" onclick="requestAmbulance()">🚑 Ambulance Alert</button><div id="actionMsg" class="msg"></div></div></div>
+<div class="card" style="margin-top:25px"><h3>Live Queue</h3><table class="table"><thead><tr><th>Token</th><th>Patient</th><th>Phone</th><th>Dept</th><th>Priority</th><th>Status</th><th>Action</th></tr></thead><tbody id="queueBody"><tr><td colspan="7" class="muted">Loading...</td></tr></tbody></table></div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const API=window.location.origin;const token=localStorage.getItem('token');const hospitalId=localStorage.getItem('hospitalId');if(!token){window.location.href='staff.html'}document.getElementById('welcome').innerText=`${localStorage.getItem('hospitalName')||'Hospital'} • ${localStorage.getItem('user')||'User'} (${localStorage.getItem('role')||'staff'})`;const headers={'Content-Type':'application/json','Authorization':'Bearer '+token};
+if(window.io&&hospitalId){const socket=io();socket.emit('join_hospital',hospitalId);socket.on('queue_update',loadAll)}
+async function api(path,opts={}){opts.headers={...headers,...(opts.headers||{})};const res=await fetch(API+path,opts);const data=await res.json().catch(()=>({}));if(!res.ok) throw new Error(data.error||'Request failed');return data}
+async function loadAnalytics(){try{const d=await api('/api/analytics');waiting.innerText=d.todayWaiting||0;called.innerText=d.todayCalled||0;done.innerText=d.todayDone||0;total.innerText=d.todayTotal||0;}catch(e){console.log(e)}}
+async function loadQueue(){try{const d=await api('/api/queue/status');const body=document.getElementById('queueBody');if(!d.tokens.length){body.innerHTML='<tr><td colspan="7" class="muted">No patients in queue</td></tr>';return;}body.innerHTML=d.tokens.map(t=>`<tr><td>#${t.tokenNumber}</td><td>${t.patientName}</td><td>${t.phone}</td><td>${t.department}</td><td>${t.priority}</td><td>${t.status}</td><td><button onclick="markDone('${t._id}')">Done</button></td></tr>`).join('');}catch(e){queueBody.innerHTML=`<tr><td colspan="7" class="err">${e.message}</td></tr>`}}
+async function loadAll(){await loadAnalytics();await loadQueue()}
+async function addPatient(){addMsg.innerText='';try{const body={patientName:pname.value.trim(),phone:phone.value.trim(),age:age.value,gender:gender.value,department:department.value,priority:priority.value,notes:notes.value};const d=await api('/api/queue/add',{method:'POST',body:JSON.stringify(body)});addMsg.innerText=`Token #${d.token.tokenNumber} created`;pname.value=phone.value=age.value=notes.value='';loadAll();}catch(e){addMsg.innerHTML=`<span class="err">${e.message}</span>`}}
+async function callNext(){try{const d=await api('/api/queue/next',{method:'POST',body:JSON.stringify({department:department.value})});actionMsg.innerText=`Called Token #${d.token.tokenNumber}`;loadAll();}catch(e){actionMsg.innerHTML=`<span class="err">${e.message}</span>`}}
+async function markDone(id){try{await api(`/api/queue/${id}/status`,{method:'PATCH',body:JSON.stringify({status:'Done'})});loadAll();}catch(e){alert(e.message)}}
+async function testWhatsApp(){try{await api('/api/whatsapp/test',{method:'POST',body:JSON.stringify({message:'MediTrack test message ✅'})});actionMsg.innerText='WhatsApp test sent';}catch(e){actionMsg.innerHTML=`<span class="err">${e.message}</span>`}}
+async function requestAmbulance(){try{await api('/api/ambulance',{method:'POST',body:JSON.stringify({phone:'Staff Request',location:'Clinic'})});actionMsg.innerText='Ambulance alert sent';}catch(e){actionMsg.innerHTML=`<span class="err">${e.message}</span>`}}
+function logout(){localStorage.clear();window.location.href='index.html'}
+loadAll();setInterval(loadAll,8000);
+</script>
+</body>
+</html>

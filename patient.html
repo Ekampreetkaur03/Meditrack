@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Patient Portal - MediTrack</title>
+<style>
+*{box-sizing:border-box} body{font-family:Arial;background:#f3f4f6;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}.container{background:white;padding:35px;border-radius:20px;width:420px;box-shadow:0 10px 25px rgba(0,0,0,.1);text-align:center}h2{color:#2563EB}input{width:100%;padding:12px;margin-top:12px;border-radius:10px;border:1px solid #ccc}button{width:100%;padding:12px;margin-top:18px;border:none;border-radius:10px;background:#2563EB;color:white;font-weight:bold;cursor:pointer}.info{margin-top:20px;background:#f9fafb;padding:18px;border-radius:12px;text-align:left;line-height:1.7}.token{font-size:28px;font-weight:bold;color:#2563EB;text-align:center;margin-bottom:12px}.error{color:red;font-weight:bold}.back{background:#6b7280}.danger{background:#dc2626}
+</style>
+</head>
+<body>
+<div class="container"><h2>Patient Portal</h2><p>Check your live queue status</p><input type="tel" id="phone" placeholder="Enter Phone Number" maxlength="10"><button onclick="checkStatus()">Check Queue Status</button><div id="result" class="info">No token checked yet</div><button class="danger" onclick="callAmbulance()">🚑 Emergency Ambulance</button><button class="back" onclick="goHome()">Back to Home</button></div>
+<script>
+const API=window.location.origin;const params=new URLSearchParams(window.location.search);const phoneFromURL=params.get('phone');if(phoneFromURL){document.getElementById('phone').value=phoneFromURL;checkStatus();if(params.get('emergency')==='true') setTimeout(callAmbulance,500)}
+function validPhone(phone){return /^[6-9]\d{9}$/.test(phone)}
+async function checkStatus(){let phone=document.getElementById('phone').value.trim();let result=document.getElementById('result');if(!validPhone(phone)){result.innerHTML='<span class="error">Enter valid 10 digit phone number</span>';return;}result.innerHTML='Loading queue status...';try{const res=await fetch(`${API}/api/queue/patient/${phone}`);const data=await res.json();if(!res.ok){result.innerHTML='<span class="error">No token found for this phone number</span>';return;}result.innerHTML=`<div class="token">Token #${data.token.tokenNumber}</div><b>Patient:</b> ${data.token.patientName}<br><b>Status:</b> ${data.token.status}<br><b>Department:</b> ${data.token.department}<br><b>Priority:</b> ${data.token.priority}<br><b>Patients Ahead:</b> ${data.ahead||0}<br><b>Estimated Wait:</b> ${data.wait||0} mins`;}catch(err){result.innerHTML='<span class="error">Error loading queue. Backend may not be running.</span>';console.log(err);}}
+async function callAmbulance(){const phone=document.getElementById('phone').value.trim();if(!validPhone(phone)){alert('Enter valid phone number first');return;}try{await fetch(API+'/api/ambulance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});alert('🚑 Ambulance request sent!');}catch(e){alert('Ambulance request noted locally. Backend not reachable.');}}
+function goHome(){window.location.href='index.html'}
+</script>
+</body>
+</html>

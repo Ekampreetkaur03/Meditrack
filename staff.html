@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MediTrack Staff</title>
+<style>
+*{box-sizing:border-box} body{font-family:Arial,sans-serif;background:#0f172a;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;color:white}.box{width:430px;background:#111827;padding:34px;border-radius:24px;box-shadow:0 20px 40px rgba(0,0,0,.35)}h1{text-align:center;color:#67e8f9;margin:5px 0}.small{text-align:center;color:#94a3b8}.tabs{display:flex;background:#0b1220;border-radius:14px;margin:25px 0}.tabs button{flex:1;background:transparent;color:#94a3b8;border:0;padding:14px;border-radius:12px;font-weight:bold;cursor:pointer}.tabs button.active{background:#7c3aed;color:white}input{width:100%;padding:14px;margin-top:12px;border-radius:12px;border:1px solid #334155;background:#0b1220;color:white}button.main{width:100%;padding:14px;margin-top:16px;border:0;border-radius:12px;background:linear-gradient(90deg,#06b6d4,#7c3aed);color:white;font-weight:bold;cursor:pointer}.linkbtn{background:transparent;border:1px solid #334155;color:white;padding:10px 14px;border-radius:10px;margin-top:12px;cursor:pointer;width:100%}.error{color:#f87171;text-align:center;margin-top:12px}.success{color:#4ade80;text-align:center;margin-top:12px}.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="box">
+<h1>MediTrack</h1><p class="small">Smart Hospital Queue Management</p>
+<div class="tabs"><button id="loginTab" class="active" onclick="showMode('login')">Staff Login</button><button id="registerTab" onclick="showMode('register')">Register Hospital</button></div>
+<div id="loginForm">
+<input id="hospitalUsername" placeholder="Hospital Username">
+<input id="staffUsername" placeholder="Staff Username e.g. medi123_admin">
+<input id="staffPassword" type="password" placeholder="Password">
+<button class="main" onclick="staffLogin()">Sign In</button>
+<button class="linkbtn" onclick="hospitalAdminLogin()">Login as Hospital Admin</button>
+</div>
+<div id="registerForm" class="hidden">
+<input id="hospitalName" placeholder="Hospital Name">
+<input id="hospitalAddress" placeholder="Address">
+<input id="newHospitalUsername" placeholder="Username for login">
+<input id="newHospitalPassword" type="password" placeholder="Password">
+<button class="main" onclick="registerHospital()">Register Hospital</button>
+</div>
+<div id="msg" class="error"></div>
+</div>
+<script>
+const API=window.location.origin;
+function showMode(mode){document.getElementById('msg').innerText='';document.getElementById('loginForm').classList.toggle('hidden',mode!=='login');document.getElementById('registerForm').classList.toggle('hidden',mode!=='register');document.getElementById('loginTab').classList.toggle('active',mode==='login');document.getElementById('registerTab').classList.toggle('active',mode==='register');}
+function setMsg(text,ok=false){const m=document.getElementById('msg');m.className=ok?'success':'error';m.innerText=text;}
+async function registerHospital(){try{const body={name:document.getElementById('hospitalName').value.trim(),address:document.getElementById('hospitalAddress').value.trim(),username:document.getElementById('newHospitalUsername').value.trim(),password:document.getElementById('newHospitalPassword').value.trim()};const res=await fetch(API+'/api/auth/hospital/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await res.json();if(!res.ok) return setMsg(data.error||'Registration failed');setMsg(`Registered successfully. Staff username: ${data.adminUsername}`,true);showMode('login');document.getElementById('hospitalUsername').value=body.username;document.getElementById('staffUsername').value=data.adminUsername;}catch(e){setMsg('Server error. Make sure backend is running.')}}
+async function staffLogin(){try{const body={hospitalUsername:document.getElementById('hospitalUsername').value.trim(),username:document.getElementById('staffUsername').value.trim(),password:document.getElementById('staffPassword').value.trim()};const res=await fetch(API+'/api/auth/staff/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await res.json();if(!res.ok) return setMsg(data.error||'Invalid credentials');localStorage.setItem('token',data.token);localStorage.setItem('user',data.user.name);localStorage.setItem('role',data.user.role);localStorage.setItem('hospitalId',data.user.hospital._id);localStorage.setItem('hospitalName',data.user.hospital.name);window.location.href='dashboard.html';}catch(e){setMsg('Server error. Make sure backend is running.')}}
+async function hospitalAdminLogin(){try{const body={username:document.getElementById('hospitalUsername').value.trim(),password:document.getElementById('staffPassword').value.trim()};const res=await fetch(API+'/api/auth/hospital/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await res.json();if(!res.ok) return setMsg(data.error||'Invalid credentials');localStorage.setItem('token',data.token);localStorage.setItem('user',data.hospital.name);localStorage.setItem('role','hospital-admin');localStorage.setItem('hospitalId',data.hospital.id);localStorage.setItem('hospitalName',data.hospital.name);window.location.href='dashboard.html';}catch(e){setMsg('Server error. Make sure backend is running.')}}
+</script>
+</body>
+</html>

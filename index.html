@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MediTrack</title>
+<style>
+*{box-sizing:border-box} body{font-family:Arial, sans-serif;background:#f3f4f6;margin:0;color:#111827} header{text-align:center;padding:42px 20px 20px} h1{color:#2563EB;font-size:42px;margin:0} .subtitle{color:#6b7280} .container{display:flex;justify-content:center;gap:30px;padding:30px;flex-wrap:wrap}.card{background:white;width:310px;min-height:250px;padding:28px;border-radius:20px;box-shadow:0 8px 20px rgba(0,0,0,.1);text-align:center}.icon{font-size:42px} .card p{color:#6b7280;line-height:1.4} input{width:100%;padding:12px;margin-top:12px;border-radius:10px;border:1px solid #ccc} button{background:#2563EB;color:white;border:none;padding:12px 18px;border-radius:10px;cursor:pointer;margin-top:15px;width:100%;font-weight:bold}.danger{background:#dc2626}.error{color:red;font-size:13px;margin-top:8px}
+</style>
+</head>
+<body>
+<header><h1>MediTrack</h1><p class="subtitle">Smart Hospital Queue Management System</p></header>
+<div class="container">
+  <div class="card"><div class="icon">🧑</div><h2>Patient Login</h2><p>Check your token, live queue status and estimated waiting time.</p><input type="tel" id="patientPhone" placeholder="Enter Phone Number" maxlength="10"><div id="patientError" class="error"></div><button onclick="openPatientPortal()">Login Now</button></div>
+  <div class="card"><div class="icon">👨‍⚕️</div><h2>Staff Login</h2><p>Manage patient registration, live queue, doctors and WhatsApp alerts.</p><button onclick="window.location.href='staff.html'">Login Now</button></div>
+  <div class="card"><div class="icon">🚑</div><h2>Emergency</h2><p>Send quick ambulance request notification to the hospital team.</p><input type="tel" id="emergencyPhone" placeholder="Enter Phone Number" maxlength="10"><button class="danger" onclick="openEmergency()">Open Emergency</button></div>
+</div>
+<script>
+function validPhone(phone){return /^[6-9]\d{9}$/.test(phone)}
+function openPatientPortal(){const phone=document.getElementById('patientPhone').value.trim();const error=document.getElementById('patientError');error.innerText='';if(!validPhone(phone)){error.innerText='Enter valid 10 digit phone number';return;}window.location.href='patient.html?phone='+phone;}
+function openEmergency(){const phone=document.getElementById('emergencyPhone').value.trim();if(!validPhone(phone)){alert('Enter valid 10 digit phone number');return;}window.location.href='patient.html?phone='+phone+'&emergency=true';}
+</script>
+</body>
+</html>
